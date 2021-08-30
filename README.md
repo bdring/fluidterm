@@ -25,5 +25,8 @@ Changes
 - With Python: **python fluidterm.py**
 - Windows: double click on **fluidterm.exe** 
 
+### Restarting the eSP32
+
+You can restart the ESP32 to see the boot messages with the FluidNC **$bye** command or you can toggle the DTR function to restart most ESP32 modules by doing Ctrl+T Ctrl+D twice. 
 
 <img src="https://github.com/bdring/fluidterm/blob/main/images/screenshot_01.png" width="800" >
