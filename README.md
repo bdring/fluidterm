@@ -18,6 +18,8 @@ Changes
 
 - You can run it as a python script or as a Windows exe.
 
+<img src="https://github.com/bdring/fluidterm/blob/main/images/screenshot_01.png" width="800" >
+
   
 
   -  
