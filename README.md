@@ -2,7 +2,7 @@
 
 ### Overview
 
-This is a clone of the python miniterm with changes made for [FluidNC](https://github.com/bdring/FluidNC). FluidNC is a next generation CNC controller that runs on ESP32 hardware.
+This is a clone of the python [miniterm](https://github.com/pyserial/pyserial/blob/master/serial/tools/miniterm.py) with changes made for [FluidNC](https://github.com/bdring/FluidNC). FluidNC is a next generation CNC controller that runs on ESP32 hardware.
 
 In most case no parameters need to be supplied.
 
