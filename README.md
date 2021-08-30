@@ -8,15 +8,15 @@ In most cases no parameters need to be supplied, but all miniterm parameters and
 
 Changes
 
-- The default serial port parameter match FluidNC
+- The default serial port parameters match FluidNC
 
-  - Baud: 115200
-  - EOL: CRLF
-  - Echo: On
+  - **Baudrate**: 115200
+  - **EOL**: CRLF
+  - **Echo**: On
 
-- If there is one serial port, it will attempt to use it. If there is more than one, you will be present a list to choose from.
+- If there is one serial port, it will attempt to use it. If there is more than one, you will be presented a list to choose from.
 
-- There is a new Transformation to colorize FluidNC responses.
+- There is a new Transformation to colorize FluidNC responses. It uses that by default.
 
 - You can run it as a python script or as a [Windows exe](https://github.com/bdring/fluidterm/tree/main/dist).
 
