@@ -4,7 +4,7 @@
 
 This is a clone of the python [miniterm](https://github.com/pyserial/pyserial/blob/master/serial/tools/miniterm.py) with changes made for [FluidNC](https://github.com/bdring/FluidNC). FluidNC is a next generation CNC controller that runs on ESP32 hardware.
 
-In most case no parameters need to be supplied.
+In most cases no parameters need to be supplied, but all miniterm parameters and hotkeys are still supported. 
 
 Changes
 
