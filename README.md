@@ -23,7 +23,7 @@ Changes
 ### Usage
 
 - With Python: **python fluidterm.py**
-- Windows: double click on **fluidterm.exe** 
+- Windows: double click on **fluidterm.exe** or open a Powershell window in the folder and send **./fluidterm.exe**
 
 ### Restarting the eSP32
 
