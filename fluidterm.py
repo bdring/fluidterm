@@ -164,6 +164,12 @@ if os.name == 'nt':  # noqa
             sys.stderr = codecs.getwriter('UTF-8')(Out(sys.stderr.fileno()), 'replace')
             sys.stdout = self.output
             self.output.encoding = 'UTF-8'  # needed for input
+            os.system('color 0f') # sets the background to blue
+
+            #if os.name == 'nt':
+            #    os.system('color 0f') # sets the background to blue
+            #else:
+            #    os.system('setterm -background white -foreground white -store')
 
         def __del__(self):
             ctypes.windll.kernel32.SetConsoleOutputCP(self._saved_ocp)
@@ -341,10 +347,10 @@ class FuildNC(Transform):
     def __init__(self):
         # XXX make it configurable, use colorama?
         self.input_color = '\x1b[37m'
-        self.echo_color = '\x1b[90m'
+        self.echo_color = '\x1b[94m'
         self.good_color = '\x1b[92m'
         self.warn_color = '\x1b[93m'
-        self.error_color = '\x1b[31m'
+        self.error_color = '\x1b[91m'
 
 
     def rx(self, text):
@@ -378,13 +384,13 @@ class FuildNC(Transform):
         return self.echo_color + text # no need to buffer RX right now
 
     def rx_color(self, text):
-        text = text.replace('ERR',  self.error_color + 'ERR' + self.input_color)
-        text = text.replace('INFO',  self.good_color + 'INFO' + self.input_color)
-        text = text.replace('WARN',  self.warn_color + 'WARN' + self.input_color)
+        text = text.replace('MSG:ERR',  self.error_color + 'MSG:ERR' + self.input_color)
+        text = text.replace('MSG:INFO',  self.good_color + 'MSG:INFO' + self.input_color)
+        text = text.replace('MSG:WARN',  self.warn_color + 'MSG:WARN' + self.input_color)
 
-        text = text.replace('Alarm',  self.warn_color + 'Alarm' + self.input_color)
-        text = text.replace('Idle',  self.good_color + 'Idle' + self.input_color)
-        text = text.replace('Run',  self.good_color + 'Run' + self.input_color)
+        text = text.replace('<Alarm',  "<" + self.warn_color + 'Alarm' + self.input_color)
+        text = text.replace('<Idle',  "<" + self.good_color + 'Idle' + self.input_color)
+        text = text.replace('<Run',  "<" + self.good_color + 'Run' + self.input_color)
 
         text = text.replace('error:',  self.error_color + 'error:' + self.input_color)
 
@@ -464,7 +470,7 @@ class Miniterm(object):
     Handle special keys from the console to show menu etc.
     """
 
-    def __init__(self, serial_instance, echo=False, eol='crlf', filters=()):
+    def __init__(self, serial_instance, echo=False, eol='lf', filters=()):
         self.console = Console()
         self.serial = serial_instance
         self.echo = echo
@@ -977,7 +983,7 @@ def main(default_port=None, default_baudrate=115200, default_rts=None, default_d
         choices=['CR', 'LF', 'CRLF'],
         type=lambda c: c.upper(),
         help='end of line mode',
-        default='CRLF')
+        default='LF')
 
     group.add_argument(
         '--raw',
