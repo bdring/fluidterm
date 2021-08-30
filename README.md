@@ -2,7 +2,9 @@
 
 ### Overview
 
-This is a clone of the python miniterm with changes made for FluidNC. In most case no parameters need to be supplied
+This is a clone of the python miniterm with changes made for [FluidNC](https://github.com/bdring/FluidNC). FluidNC is a next generation CNC controller that runs on ESP32 hardware.
+
+In most case no parameters need to be supplied.
 
 Changes
 
@@ -18,9 +20,5 @@ Changes
 
 - You can run it as a python script or as a Windows exe.
 
+
 <img src="https://github.com/bdring/fluidterm/blob/main/images/screenshot_01.png" width="800" >
-
-  
-
-  -  
-
