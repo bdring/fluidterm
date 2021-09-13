@@ -340,7 +340,7 @@ class Colorize(Transform):
         return self.echo_color + text
 
 
-class FuildNC(Transform):
+class FluidNC(Transform):
     """Apply different colors for received and echo"""
     buffy = '' # buffer the rx chars until we get a full line to analyze and color
 
@@ -351,6 +351,7 @@ class FuildNC(Transform):
         self.good_color = '\x1b[92m'
         self.warn_color = '\x1b[93m'
         self.error_color = '\x1b[91m'
+        self.debug_color = '\x1b[93m'
 
 
     def rx(self, text):
@@ -359,8 +360,9 @@ class FuildNC(Transform):
         self.buffy = self.buffy + text
         retval = ''
 
-        if ('\r\n' in self.buffy):            
-            rx_lines = self.buffy.split('\r\n')
+        if ('\n' in self.buffy):         
+            self.buffy = self.buffy.replace('\r','')
+            rx_lines = self.buffy.split('\n')
 
             if (self.buffy[-1] in '\n'): # is the last character is a new line
                 #everything in the split is ready to be parsed
@@ -387,6 +389,7 @@ class FuildNC(Transform):
         text = text.replace('MSG:ERR',  self.error_color + 'MSG:ERR' + self.input_color)
         text = text.replace('MSG:INFO',  self.good_color + 'MSG:INFO' + self.input_color)
         text = text.replace('MSG:WARN',  self.warn_color + 'MSG:WARN' + self.input_color)
+        text = text.replace('MSG:DBG',  self.debug_color + 'MSG:DBG' + self.input_color)
 
         text = text.replace('<Alarm',  "<" + self.warn_color + 'Alarm' + self.input_color)
         text = text.replace('<Idle',  "<" + self.good_color + 'Idle' + self.input_color)
@@ -429,7 +432,7 @@ TRANSFORMATIONS = {
     'nocontrol': NoControls,
     'printable': Printable,
     'colorize': Colorize,
-    'fluidNC': FuildNC,
+    'fluidNC': FluidNC,
     'debug': DebugIO,
 }
 
