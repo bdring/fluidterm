@@ -355,13 +355,11 @@ class FluidNC(Transform):
 
 
     def rx(self, text):
-        #return self.input_color + text
-
-        self.buffy = self.buffy + text
+        self.buffy = self.buffy + text.replace('\r','')
         retval = ''
 
         if ('\n' in self.buffy):         
-            self.buffy = self.buffy.replace('\r','')
+            #self.buffy = self.buffy.replace('\r','')
             rx_lines = self.buffy.split('\n')
 
             if (self.buffy[-1] in '\n'): # is the last character is a new line
@@ -369,6 +367,7 @@ class FluidNC(Transform):
                 for a_line in rx_lines:
                     retval = retval + self.rx_color(a_line) + '\r\n'
                 self.buffy = '' ## clear the buffer
+                retval = retval[:-2] #remove extra line end
             else:
                 #last in the split does not have a crlf
                 for a_line in rx_lines:
@@ -578,7 +577,12 @@ class Miniterm(object):
         try:
             while self.alive and self._reader_alive:
                 # read all that is there or wait for one byte
-                data = self.serial.read(self.serial.in_waiting or 1)
+                try:
+                    data = self.serial.read(self.serial.in_waiting or 1)
+                except:
+                    print("Connection lost")
+                    self.stop()
+                    break
                 if data:
                     if self.raw:
                         self.console.write_fluid(data)
