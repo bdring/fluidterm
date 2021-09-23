@@ -352,6 +352,10 @@ class FluidNC(Transform):
         self.warn_color = '\x1b[93m'
         self.error_color = '\x1b[91m'
         self.debug_color = '\x1b[93m'
+        self.white_color = '\x1b[1;37;40m'
+        self.purple_color = '\x1b[1;35;40m'
+        self.cyan_color = '\x1b[1;36;40m'
+        self.yellow_color = '\x1b[1;33;40m'
 
 
     def rx(self, text):
@@ -384,7 +388,17 @@ class FluidNC(Transform):
     def echo(self, text):
         return self.echo_color + text # no need to buffer RX right now
 
-    def rx_color(self, text):
+    def rx_color(self, text):        
+        if len(text) == 0:
+            return text
+            
+        if text[0] == '$': #colorize settings
+            rx_lines = text.split('=')
+            if (len(rx_lines) == 2):
+                rx_lines[0] = self.cyan_color + rx_lines[0] + self.white_color + '='
+                rx_lines[1] = self.yellow_color + rx_lines[1] + self.input_color
+                return rx_lines[0] + rx_lines[1]
+			
         text = text.replace('MSG:ERR',  self.error_color + 'MSG:ERR' + self.input_color)
         text = text.replace('MSG:INFO',  self.good_color + 'MSG:INFO' + self.input_color)
         text = text.replace('MSG:WARN',  self.warn_color + 'MSG:WARN' + self.input_color)
