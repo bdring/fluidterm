@@ -386,6 +386,7 @@ class FluidNC(Transform):
         
 
     def echo(self, text):
+        text = text.replace(chr(0x18), '[reset]\r\n')
         return self.echo_color + text # no need to buffer RX right now
 
     def rx_color(self, text):        
