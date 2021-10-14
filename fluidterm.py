@@ -19,6 +19,8 @@ import serial
 from serial.tools.list_ports import comports
 from serial.tools import hexlify_codec
 
+from xmodem import XMODEM
+
 # pylint: disable=wrong-import-order,wrong-import-position
 
 codecs.register(lambda c: hexlify_codec.getregentry() if c == 'hexlify' else None)
@@ -734,8 +736,9 @@ class Miniterm(object):
             self.stop()                         # Q -> exit app
         else:
             sys.stderr.write('--- unknown menu character {} --\n'.format(key_description(c)))
+            
 
-    def upload_file(self):
+    def upload_file(self):            
         """Ask user for filename and send its contents"""
         sys.stderr.write('\n--- File to upload: ')
         sys.stderr.flush()
@@ -743,17 +746,14 @@ class Miniterm(object):
             filename = sys.stdin.readline().rstrip('\r\n')
             if filename:
                 try:
-                    with open(filename, 'rb') as f:
-                        sys.stderr.write('--- Sending file {} ---\n'.format(filename))
-                        while True:
-                            block = f.read(1024)
-                            if not block:
-                                break
-                            self.serial.write(block)
-                            # Wait for output buffer to drain.
-                            self.serial.flush()
-                            sys.stderr.write('.')   # Progress indicator.
-                    sys.stderr.write('\n--- File {} sent ---\n'.format(filename))
+                    #send the command to put FluidNC in receive mode
+                    self.serial.write('$Xmodem/Receive=foo.txt\r'.encode())
+                    #show what is happening in the console.
+                    self.console.write('--- Sending file {} ---\n'.format(filename))
+                    # modem = XMODEM(self.upload_getc, self.upload_putc)
+                    # stream = open(filename, 'rb')
+                    # modem.send(stream)
+                        
                 except IOError as e:
                     sys.stderr.write('--- ERROR opening file {}: {} ---\n'.format(filename, e))
 
