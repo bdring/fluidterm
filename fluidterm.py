@@ -397,7 +397,7 @@ class FluidNC(Transform):
 
     def echo(self, text):
         text = text.replace(chr(0x18), '[reset]\r\n')
-        return self.echo_color + text # no need to buffer RX right now
+        return self.cyan_color + text # no need to buffer RX right now
 
     def rx_color(self, text):        
         if len(text) == 0:
@@ -622,19 +622,9 @@ class Miniterm(object):
                             self.console.write_fluid(data)
                         else:
                             text = self.rx_decoder.decode(data)
-
-                            # WMB does not work well right now because the writer thread blocks
-                            # waiting for a key
-                            filename = ''
-                            if text.find('MSG:INFO: Receiving ') != -1:
-                                filename = text[20:].split()[0]
-                                # qt.put('Upload');
-
                             for transformation in self.rx_transformations:
                                 text = transformation.rx(text)
                             self.console.write(text)
-                            if filename:
-                                self.upload_file(filename)
         except serial.SerialException:
             self.alive = False
             self.console.cancel()
