@@ -624,7 +624,7 @@ class Miniterm(object):
                             text = self.rx_decoder.decode(data)
                             for transformation in self.rx_transformations:
                                 text = transformation.rx(text)
-                                self.console.write(text)
+                            self.console.write(text)
         except serial.SerialException:
             self.alive = False
             self.console.cancel()
