@@ -15,7 +15,6 @@ from re import split
 import sys
 import threading
 import logging
-import queue
 from tkinter import *
 from tkinter import filedialog
 from tkinter import simpledialog
@@ -25,9 +24,6 @@ from serial.tools.list_ports import comports
 from serial.tools import hexlify_codec
 
 from xmodem import XMODEM
-
-q=queue.Queue()
-qt=queue.Queue()
 
 # Uncomment this line to debug XModem
 # logging.basicConfig(level=logging.DEBUG)
