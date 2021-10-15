@@ -16,8 +16,9 @@ import sys
 import threading
 import logging
 import queue
-import easygui
-import PySimpleGUI as sg
+from tkinter import *
+from tkinter import filedialog
+from tkinter import simpledialog
 
 import serial
 from serial.tools.list_ports import comports
@@ -513,7 +514,8 @@ class Miniterm(object):
         self.receiver_thread = None
         self.rx_decoder = None
         self.tx_decoder = None
-        self._uploading = False
+        self._xmodem_stream = None
+        self._pushback = None
 
     def _start_reader(self):
         """Start reader thread"""
@@ -609,9 +611,12 @@ class Miniterm(object):
                     self.stop()
                     break
                 if data:
-                    if self._uploading:
-                        # Send the data to the writer thread which runs the upload code
-                        q.put(data[0:1]);
+                    if self._xmodem_stream:
+                        self._pushback = data
+                        modem = XMODEM(self.getc, self.putc, mode='xmodem1k')
+                        modem.send(self._xmodem_stream, callback=self.progress)
+                        modem = None
+                        self._xmodem_stream = None
                     else:
                         if self.raw:
                             self.console.write_fluid(data)
@@ -680,6 +685,8 @@ class Miniterm(object):
             self.serial.write(self.tx_encoder.encode(c))
             if self.echo:
                 self.console.write(c)
+        elif c == '\x18':                       # CTRL+X -> upload xmodem
+            self.upload_xmodem()
         elif c == '\x15':                       # CTRL+U -> upload file
             self.upload_file()
         elif c in '\x08hH?':                    # CTRL+H, h, H, ? -> Show help
@@ -761,6 +768,10 @@ class Miniterm(object):
             
     # Support functions for XModem file upload
     def getc(self, length, timeout=1):
+        if self._pushback:
+            gdata = self._pushback
+            self._pushback = None
+            return gdata
         # try:
         #    gdata = q.get(timeout=timeout)
         # except:
@@ -786,24 +797,48 @@ class Miniterm(object):
     def progress(self, packets, good, bad):
         print(packets, end='\r')
 
-    def upload_file(self, name="config.yaml"):
+
+    def file_dialog(self, initial):
+        window = Tk()
+        pathname = filedialog.askopenfilename(title="File to Upload", initialfile=initial, filetypes=[("FluidNC Config", "*.yaml *.flnc"), ("All files", "*")])
+        destname = simpledialog.askstring("Uploader", "Destination Filename", initialvalue=os.path.split(pathname)[1])
+        window.destroy()
+        return (pathname, destname)
+
+    def upload_xmodem(self):
         """Ask user for filename and send its contents"""
-        # self._uploading = True
-        # sys.stderr.write('\n--- File to upload: ')
-        # sys.stderr.flush()
         with self.console:
-            # filename = sys.stdin.readline().rstrip('\r\n')
-            filename = easygui.fileopenbox(default=name)
+            (filename, destname) = self.file_dialog("config.flnc")
             if filename:
                 try:
-                    #send the command to put FluidNC in receive mode
-                    # self.serial.write('$Xmodem/Receive=foo.txt\r'.encode())
+                    self._xmodem_stream = open(filename, 'rb')
                     #show what is happening in the console.
-                    self.console.write('--- Sending file {} ---\n'.format(filename))
-                    stream = open(filename, 'rb')
-                    modem = XMODEM(self.getc, self.putc, mode='xmodem1k')
-                    self.flush_getc(1)
-                    modem.send(stream, callback=self.progress)
+                    self.console.write('--- Sending file {} as {} ---\n'.format(filename, destname))
+                    #send the command to put FluidNC in receive mode
+                    self.serial.write(self.tx_encoder.encode(f'$Xmodem/Receive={destname}\n'))
+                except IOError as e:
+                    sys.stderr.write('--- ERROR opening file {}: {} ---\n'.format(filename, e))
+        # self._uploading = False
+
+    def upload_file(self, name="config.flnc"):
+        """Ask user for filename and send its contents"""
+        sys.stderr.write('\n--- File to upload: ')
+        sys.stderr.flush()
+        with self.console:
+            filename = sys.stdin.readline().rstrip('\r\n')
+            if filename:
+                try:
+                    with open(filename, 'rb') as f:
+                        sys.stderr.write('--- Sending file {} ---\n'.format(filename))
+                        while True:
+                            block = f.read(1024)
+                            if not block:
+                                break
+                            self.serial.write(block)
+                            # Wait for output buffer to drain.
+                            self.serial.flush()
+                            sys.stderr.write('.')   # Progress indicator.
+                    sys.stderr.write('\n--- File {} sent ---\n'.format(filename))
                 except IOError as e:
                     sys.stderr.write('--- ERROR opening file {}: {} ---\n'.format(filename, e))
         # self._uploading = False
