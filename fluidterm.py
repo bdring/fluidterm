@@ -409,11 +409,6 @@ class FluidNC(Transform):
                 rx_lines[1] = self.yellow_color + rx_lines[1] + self.input_color
                 return rx_lines[0] + rx_lines[1]
 			
-        # WMB does not work well right now because the writer thread blocks
-        # waiting for a key
-        # if text.find('MSG:INFO: Receiving') != -1:
-        #     qt.put('Upload');
-
         text = text.replace('MSG:ERR',  self.error_color + 'MSG:ERR' + self.input_color)
         text = text.replace('MSG:INFO',  self.good_color + 'MSG:INFO' + self.input_color)
         text = text.replace('MSG:WARN',  self.warn_color + 'MSG:WARN' + self.input_color)
@@ -622,9 +617,19 @@ class Miniterm(object):
                             self.console.write_fluid(data)
                         else:
                             text = self.rx_decoder.decode(data)
+
+                            # WMB does not work well right now because the writer thread blocks
+                            # waiting for a key
+                            filename = ''
+                            if text.find('MSG:INFO: Receiving ') != -1:
+                                filename = text[20:].split()[0]
+                                # qt.put('Upload');
+
                             for transformation in self.rx_transformations:
                                 text = transformation.rx(text)
-                                self.console.write(text)
+                            self.console.write(text)
+                            if filename:
+                                self.upload_file(filename)
         except serial.SerialException:
             self.alive = False
             self.console.cancel()
@@ -643,10 +648,6 @@ class Miniterm(object):
                     c = self.console.getkey()
                 except KeyboardInterrupt:
                     c = '\x03'
-                # if qt.qsize():
-                #     command = qt.get()
-                #     self.upload_file()
-
                 if not self.alive:
                     break
                 if menu_active:
@@ -760,15 +761,22 @@ class Miniterm(object):
             
     # Support functions for XModem file upload
     def getc(self, length, timeout=1):
-        try:
-            gdata = q.get(timeout=timeout)
-        except:
-            gdata = None
-        return gdata
+        # try:
+        #    gdata = q.get(timeout=timeout)
+        # except:
+        #    gdata = None
+        self.serial.timeout = timeout
+        gdata = self.serial.read(length)
+        return gdata or None
 
     def flush_getc(self, limit):
-        while q.qsize() > limit:
-            dummy = q.get()
+        # while q.qsize() > limit:
+        #    dummy = q.get()
+        self.serial.timeout = 0.01
+        while True:
+            gdata = self.serial.read(1)
+            if not len(gdata):
+                break
 
     def putc(self, data, timeout=1):
         pbytes = self.serial.write(data)
@@ -778,27 +786,27 @@ class Miniterm(object):
     def progress(self, packets, good, bad):
         print(packets, end='\r')
 
-    def upload_file(self):            
+    def upload_file(self, name="config.yaml"):
         """Ask user for filename and send its contents"""
-        self._uploading = True
+        # self._uploading = True
         # sys.stderr.write('\n--- File to upload: ')
         # sys.stderr.flush()
         with self.console:
             # filename = sys.stdin.readline().rstrip('\r\n')
-            filename = easygui.fileopenbox(default="config.yaml")
+            filename = easygui.fileopenbox(default=name)
             if filename:
                 try:
                     #send the command to put FluidNC in receive mode
                     # self.serial.write('$Xmodem/Receive=foo.txt\r'.encode())
                     #show what is happening in the console.
-                    self.flush_getc(0)
                     self.console.write('--- Sending file {} ---\n'.format(filename))
                     stream = open(filename, 'rb')
                     modem = XMODEM(self.getc, self.putc, mode='xmodem1k')
+                    self.flush_getc(1)
                     modem.send(stream, callback=self.progress)
                 except IOError as e:
                     sys.stderr.write('--- ERROR opening file {}: {} ---\n'.format(filename, e))
-        self._uploading = False
+        # self._uploading = False
 
     def change_filter(self):
         """change the i/o transformations"""
@@ -1123,7 +1131,7 @@ def main(default_port=None, default_baudrate=115200, default_rts=None, default_d
                 xonxoff=args.xonxoff,
                 do_not_open=True)
 
-            serial_instance.timeout = 1
+            serial_instance.timeout = 0.3
             if not hasattr(serial_instance, 'cancel_read'):
                 # enable timeout for alive flag polling if cancel_read is not available
                 serial_instance.timeout = 1
