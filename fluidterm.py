@@ -18,7 +18,6 @@ import logging
 from tkinter import *
 from tkinter import filedialog
 from tkinter import simpledialog
-import readline
 
 import serial
 from serial.tools.list_ports import comports
@@ -30,35 +29,6 @@ from xmodem import XMODEM
 # logging.basicConfig(level=logging.DEBUG)
 
 # pylint: disable=wrong-import-order,wrong-import-position
-
-class SimpleCompleter(object):
-
-    def __init__(self, options):
-        self.options = sorted(options)
-        return
-
-    def complete(self, text, state):
-        print("complete called")
-        response = None
-        if state == 0:
-            # This is the first time for this text, so build a match list.
-            if text:
-                self.matches = [s
-                                for s in self.options
-                                if s and s.startswith(text)]
-            else:
-                self.matches = self.options[:]
-
-        # Return the state'th item from the match list,
-        # if we have that many.
-        try:
-            response = self.matches[state]
-        except IndexError:
-            response = None
-        return response
-
-readline.set_completer(SimpleCompleter(['start', 'stop', 'list', 'print']).complete)
-readline.parse_and_bind('tab: complete')
 
 codecs.register(lambda c: hexlify_codec.getregentry() if c == 'hexlify' else None)
 
@@ -664,20 +634,24 @@ class Miniterm(object):
         menu_active = False
         try:
             while self.alive:
-                data = raw_input()
-                for c in data:
-                    if not self.alive:
-                        break
-                    if menu_active:
-                        self.handle_menu_key(c)
-                        menu_active = False
-                    elif c == self.menu_character:
-                        menu_active = True      # next char will be for menu
-                    elif c == self.exit_character:
-                        self.stop()             # exit app
-                        break
-                    else:
-                        self.serial.write(self.tx_encoder.encode(c))
+                with self.console:
+                    try:
+                        data = raw_input()
+                    except:
+                        data = self.exit_character  # Map ^C to exit
+                    for c in data:
+                        if not self.alive:
+                            break
+                        if menu_active:
+                            self.handle_menu_key(c)
+                            menu_active = False
+                        elif c == self.menu_character:
+                            menu_active = True      # next char will be for menu
+                        elif c == self.exit_character:
+                            self.stop()             # exit app
+                            break
+                        else:
+                            self.serial.write(self.tx_encoder.encode(c))
                 self.serial.write(self.tx_encoder.encode('\n'))
         except:
             self.alive = False
@@ -1218,7 +1192,7 @@ def main(default_port=None, default_baudrate=115200, default_rts=None, default_d
             key_description(miniterm.exit_character),
             key_description(miniterm.menu_character),
             key_description(miniterm.menu_character),
-            key_description('\x08')))
+            key_description('H')))
 
     miniterm.start()
     try:
