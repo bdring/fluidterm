@@ -130,6 +130,16 @@ if os.name == 'nt':  # noqa
             'B': '\x1b[19~',  # F8
             'C': '\x1b[20~',  # F9
             'D': '\x1b[21~',  # F10
+            'H': '\x1b[A',  # UP
+            'P': '\x1b[B',  # DOWN
+            'K': '\x1b[D',  # LEFT
+            'M': '\x1b[C',  # RIGHT
+            'G': '\x1b[H',  # HOME
+            'O': '\x1b[F',  # END
+            'R': '\x1b[2~',  # INSERT
+            'S': '\x1b[3~',  # DELETE
+            'I': '\x1b[5~',  # PGUP
+            'Q': '\x1b[6~',  # PGDN
         }
         navcodes = {
             'H': '\x1b[A',  # UP
@@ -193,6 +203,13 @@ if os.name == 'nt':  # noqa
                 elif z is unichr(0) or z is unichr(0xe0):
                     try:
                         code = msvcrt.getwch()
+                        # The z value is somewhat context-dependent
+                        # When running PowerShell in its own window,
+                        # arrow keys return z as 0xe0, but when PowerShell
+                        # is in a VsCode terminal, arrow keys give z as 0.
+                        # with the same code value in either case.
+                        # The solution is to duplicate the navcodes values
+                        # in fncodes.
                         if z is unichr(0):
                             return self.fncodes[code]
                         else:
@@ -346,6 +363,8 @@ class Colorize(Transform):
     def echo(self, text):
         return self.echo_color + text
 
+collecting_input_line = False
+
 class FluidNC(Transform):
     """Apply different colors for received and echo"""
     buffy = '' # buffer the rx chars until we get a full line to analyze and color
@@ -369,7 +388,6 @@ class FluidNC(Transform):
         retval = ''
 
         if ('\n' in self.buffy):         
-            #self.buffy = self.buffy.replace('\r','')
             rx_lines = self.buffy.split('\n')
 
             if (self.buffy[-1] in '\n'): # is the last character is a new line
@@ -608,12 +626,12 @@ class Miniterm(object):
                 if data:
                     if self._xmodem_stream:
                         self._pushback = data
-                        modem = XMODEM(self.getc, self.putc, mode='xmodem1k')
+                        modem = XMODEM(self.getc, self.putc, mode='xmodem')
                         modem.send(self._xmodem_stream, callback=self.progress)
                         modem = None
                         self._xmodem_stream = None
                     else:
-                        if self.raw:
+                        if self.raw or collecting_input_line:
                             self.console.write_fluid(data)
                         else:
                             text = self.rx_decoder.decode(data)
@@ -636,7 +654,7 @@ class Miniterm(object):
             while self.alive:
                 with self.console:
                     try:
-                        data = raw_input()
+                        data = self.console.getkey()
                     except:
                         data = self.exit_character  # Map ^C to exit
                     for c in data:
@@ -651,8 +669,9 @@ class Miniterm(object):
                             self.stop()             # exit app
                             break
                         else:
+                            global collecting_input_line
+                            collecting_input_line = c != '\n'
                             self.serial.write(self.tx_encoder.encode(c))
-                self.serial.write(self.tx_encoder.encode('\n'))
         except:
             self.alive = False
             raise
@@ -779,7 +798,7 @@ class Miniterm(object):
 
     def file_dialog(self, initial):
         window = Tk()
-        pathname = filedialog.askopenfilename(title="File to Upload", initialfile=initial, filetypes=[("FluidNC Config", "*.yaml *.flnc"), ("All files", "*")])
+        pathname = filedialog.askopenfilename(title="File to Upload", initialfile=initial, filetypes=[("FluidNC Config", "*.yaml *.flnc *.txt"), ("All files", "*")])
         destname = simpledialog.askstring("Uploader", "Destination Filename", initialvalue=os.path.split(pathname)[1])
         window.destroy()
         return (pathname, destname)
@@ -1145,7 +1164,6 @@ def main(default_port=None, default_baudrate=115200, default_rts=None, default_d
                 xonxoff=args.xonxoff,
                 do_not_open=True)
 
-            serial_instance.timeout = 0.3
             if not hasattr(serial_instance, 'cancel_read'):
                 # enable timeout for alive flag polling if cancel_read is not available
                 serial_instance.timeout = 1
