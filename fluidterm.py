@@ -100,7 +100,6 @@ class ConsoleBase(object):
     def __exit__(self, *args, **kwargs):
         self.setup()
 
-
 if os.name == 'nt':  # noqa
     import msvcrt
     import ctypes
@@ -650,6 +649,12 @@ class Miniterm(object):
         locally.
         """
         menu_active = False
+        # Sending an editing command triggers FluidNC interactive mode
+        # Right Arrow is an innocuous one
+        # If you restart FluidNC with $bye or the reset switch, you
+        # will have to trigger interactive mode manually
+        right_arrow = '\x1b[C'
+        self.serial.write(self.tx_encoder.encode(right_arrow))
         try:
             while self.alive:
                 with self.console:
