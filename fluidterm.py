@@ -19,6 +19,8 @@ from tkinter import *
 from tkinter import filedialog
 from tkinter import simpledialog
 
+import time
+
 import serial
 from serial.tools.list_ports import comports
 from serial.tools import hexlify_codec
@@ -348,13 +350,23 @@ class Printable(Transform):
     echo = rx
 
 
+gray = '\x1b[0;37;40m'
+red = '\x1b[31m'
+bright_green = '\x1b[92m'
+bright_blue = '\x1b[94m'
+bright_yellow = '\x1b[93m'
+bright_red = '\x1b[91m'
+bold_yellow = '\x1b[1;33;40m'
+bold_cyan = '\x1b[1;36;40m'
+bold_magenta = '\x1b[1;36;40m'
+bold_white = '\x1b[1;37;40m'
 class Colorize(Transform):
     """Apply different colors for received and echo"""
 
     def __init__(self):
         # XXX make it configurable, use colorama?
-        self.input_color = '\x1b[37m'
-        self.echo_color = '\x1b[31m'
+        self.input_color = gray
+        self.echo_color = red
 
     def rx(self, text):
         return self.input_color + text
@@ -370,16 +382,16 @@ class FluidNC(Transform):
 
     def __init__(self):
         # XXX make it configurable, use colorama?
-        self.input_color = '\x1b[37m'
-        self.echo_color = '\x1b[94m'
-        self.good_color = '\x1b[92m'
-        self.warn_color = '\x1b[93m'
-        self.error_color = '\x1b[91m'
-        self.debug_color = '\x1b[93m'
-        self.white_color = '\x1b[1;37;40m'
-        self.purple_color = '\x1b[1;35;40m'
-        self.cyan_color = '\x1b[1;36;40m'
-        self.yellow_color = '\x1b[1;33;40m'
+        self.input_color = gray
+        self.echo_color = bright_blue
+        self.good_color = bright_green
+        self.warn_color = bright_yellow
+        self.error_color = bright_red
+        self.debug_color = bright_yellow
+        self.white_color = bold_white
+        self.purple_color = bold_magenta
+        self.cyan_color = bold_cyan
+        self.yellow_color = bold_yellow
 
 
     def rx(self, text):
@@ -472,7 +484,6 @@ TRANSFORMATIONS = {
     'fluidNC': FluidNC,
     'debug': DebugIO,
 }
-
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 def ask_for_port():
@@ -649,12 +660,15 @@ class Miniterm(object):
         locally.
         """
         menu_active = False
+
         # Sending an editing command triggers FluidNC interactive mode
         # Right Arrow is an innocuous one
         # If you restart FluidNC with $bye or the reset switch, you
         # will have to trigger interactive mode manually
+        time.sleep(2) # Time for FluidNC to be ready for input
         right_arrow = '\x1b[C'
         self.serial.write(self.tx_encoder.encode(right_arrow))
+
         try:
             while self.alive:
                 with self.console:
