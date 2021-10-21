@@ -492,15 +492,13 @@ def ask_for_port():
     easier on systems with long device names, also allow the input of an
     index.
     """
-    sys.stderr.write('\n--- Available ports:\n')
     ports = []
+    if len(comports()) == 1:
+        return comports()[0].device
+    sys.stderr.write('\n--- Available ports:\n')
     for n, (port, desc, hwid) in enumerate(sorted(comports()), 1):
         sys.stderr.write('--- {:2}: {:20} {!r}\n'.format(n, port, desc))
-        ports.append(port)
 
-    if len(ports) == 1:
-        return ports[0]
-    
     while True:
         port = raw_input('--- Enter port index or full name: ')
         try:
