@@ -634,6 +634,9 @@ class Miniterm(object):
                 if data:
                     if self._xmodem_stream:
                         self._pushback = data
+                        while self.serial.in_waiting:
+                            # Flush any extra start characters that snuck in
+                            self._pushback = self.serial.read(1)
                         modem = XMODEM(self.getc, self.putc, mode='xmodem')
                         modem.send(self._xmodem_stream, callback=self.progress)
                         modem = None
