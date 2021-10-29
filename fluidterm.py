@@ -421,7 +421,6 @@ class FluidNC(Transform):
         
 
     def echo(self, text):
-        text = text.replace(chr(0x18), '[reset]\r\n')
         return self.cyan_color + text # no need to buffer RX right now
 
     def rx_color(self, text):        
@@ -521,7 +520,7 @@ class Miniterm(object):
     def __init__(self, serial_instance, echo=False, eol='lf', filters=()):
         self.console = Console()
         self.serial = serial_instance
-        self.echo = echo
+        self.echo = False
         self.raw = False
         self.input_encoding = 'UTF-8'
         self.output_encoding = 'UTF-8'
@@ -692,6 +691,11 @@ class Miniterm(object):
                             global collecting_input_line
                             collecting_input_line = c != '\n'
                             self.serial.write(self.tx_encoder.encode(c))
+                            if self.echo:
+                                echo_text = c
+                                for transformation in self.tx_transformations:
+                                    echo_text = transformation.echo(echo_text)
+                                self.console.write(echo_text)
         except:
             self.alive = False
             raise
