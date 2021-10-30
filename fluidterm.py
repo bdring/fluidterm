@@ -979,7 +979,7 @@ class Miniterm(object):
         """return the help text"""
         # help text, starts with blank line!
         return """
---- pySerial ({version}) - Fluidterm (miniterm) - help
+--- pySerial ({version}) - Fluidterm 1.1 (miniterm) - help
 ---
 --- {exit:8} Exit program (alias {menu} Q)
 --- {menu:8} Menu escape key, followed by:
