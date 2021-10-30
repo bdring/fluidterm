@@ -14,12 +14,21 @@ import os
 from re import split
 import sys
 import threading
+import logging
+from tkinter import *
+from tkinter import filedialog
+from tkinter import simpledialog
+
+import time
 
 import serial
 from serial.tools.list_ports import comports
 from serial.tools import hexlify_codec
 
 from xmodem import XMODEM
+
+# Uncomment this line to debug XModem
+# logging.basicConfig(level=logging.DEBUG)
 
 # pylint: disable=wrong-import-order,wrong-import-position
 
@@ -71,9 +80,6 @@ class ConsoleBase(object):
 
     def write_fluid(self, byte_string):
         """Write bytes (already encoded)"""
-        self.byte_output.write('boo')
-        if byte_string.find('\n'):
-            self.byte_output.write('foo')
         self.byte_output.write(byte_string)
         self.byte_output.flush()
 
@@ -95,7 +101,6 @@ class ConsoleBase(object):
 
     def __exit__(self, *args, **kwargs):
         self.setup()
-
 
 if os.name == 'nt':  # noqa
     import msvcrt
@@ -126,6 +131,16 @@ if os.name == 'nt':  # noqa
             'B': '\x1b[19~',  # F8
             'C': '\x1b[20~',  # F9
             'D': '\x1b[21~',  # F10
+            'H': '\x1b[A',  # UP
+            'P': '\x1b[B',  # DOWN
+            'K': '\x1b[D',  # LEFT
+            'M': '\x1b[C',  # RIGHT
+            'G': '\x1b[H',  # HOME
+            'O': '\x1b[F',  # END
+            'R': '\x1b[2~',  # INSERT
+            'S': '\x1b[3~',  # DELETE
+            'I': '\x1b[5~',  # PGUP
+            'Q': '\x1b[6~',  # PGDN
         }
         navcodes = {
             'H': '\x1b[A',  # UP
@@ -189,6 +204,13 @@ if os.name == 'nt':  # noqa
                 elif z is unichr(0) or z is unichr(0xe0):
                     try:
                         code = msvcrt.getwch()
+                        # The z value is somewhat context-dependent
+                        # When running PowerShell in its own window,
+                        # arrow keys return z as 0xe0, but when PowerShell
+                        # is in a VsCode terminal, arrow keys give z as 0.
+                        # with the same code value in either case.
+                        # The solution is to duplicate the navcodes values
+                        # in fncodes.
                         if z is unichr(0):
                             return self.fncodes[code]
                         else:
@@ -327,13 +349,24 @@ class Printable(Transform):
 
     echo = rx
 
+
+gray = '\x1b[0;37;40m'
+red = '\x1b[31m'
+bright_green = '\x1b[92m'
+bright_blue = '\x1b[94m'
+bright_yellow = '\x1b[93m'
+bright_red = '\x1b[91m'
+bold_yellow = '\x1b[1;33;40m'
+bold_cyan = '\x1b[1;36;40m'
+bold_magenta = '\x1b[1;36;40m'
+bold_white = '\x1b[1;37;40m'
 class Colorize(Transform):
     """Apply different colors for received and echo"""
 
     def __init__(self):
         # XXX make it configurable, use colorama?
-        self.input_color = '\x1b[37m'
-        self.echo_color = '\x1b[31m'
+        self.input_color = gray
+        self.echo_color = red
 
     def rx(self, text):
         return self.input_color + text
@@ -341,6 +374,7 @@ class Colorize(Transform):
     def echo(self, text):
         return self.echo_color + text
 
+collecting_input_line = False
 
 class FluidNC(Transform):
     """Apply different colors for received and echo"""
@@ -348,16 +382,16 @@ class FluidNC(Transform):
 
     def __init__(self):
         # XXX make it configurable, use colorama?
-        self.input_color = '\x1b[37m'
-        self.echo_color = '\x1b[94m'
-        self.good_color = '\x1b[92m'
-        self.warn_color = '\x1b[93m'
-        self.error_color = '\x1b[91m'
-        self.debug_color = '\x1b[93m'
-        self.white_color = '\x1b[1;37;40m'
-        self.purple_color = '\x1b[1;35;40m'
-        self.cyan_color = '\x1b[1;36;40m'
-        self.yellow_color = '\x1b[1;33;40m'
+        self.input_color = gray
+        self.echo_color = bright_blue
+        self.good_color = bright_green
+        self.warn_color = bright_yellow
+        self.error_color = bright_red
+        self.debug_color = bright_yellow
+        self.white_color = bold_white
+        self.purple_color = bold_magenta
+        self.cyan_color = bold_cyan
+        self.yellow_color = bold_yellow
 
 
     def rx(self, text):
@@ -365,7 +399,6 @@ class FluidNC(Transform):
         retval = ''
 
         if ('\n' in self.buffy):         
-            #self.buffy = self.buffy.replace('\r','')
             rx_lines = self.buffy.split('\n')
 
             if (self.buffy[-1] in '\n'): # is the last character is a new line
@@ -388,8 +421,7 @@ class FluidNC(Transform):
         
 
     def echo(self, text):
-        text = text.replace(chr(0x18), '[reset]\r\n')
-        return self.echo_color + text # no need to buffer RX right now
+        return self.cyan_color + text # no need to buffer RX right now
 
     def rx_color(self, text):        
         if len(text) == 0:
@@ -452,7 +484,6 @@ TRANSFORMATIONS = {
     'debug': DebugIO,
 }
 
-
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 def ask_for_port():
     """\
@@ -460,15 +491,13 @@ def ask_for_port():
     easier on systems with long device names, also allow the input of an
     index.
     """
-    sys.stderr.write('\n--- Available ports:\n')
     ports = []
+    if len(comports()) == 1:
+        return comports()[0].device
+    sys.stderr.write('\n--- Available ports:\n')
     for n, (port, desc, hwid) in enumerate(sorted(comports()), 1):
         sys.stderr.write('--- {:2}: {:20} {!r}\n'.format(n, port, desc))
-        ports.append(port)
 
-    if len(ports) == 1:
-        return ports[0]
-    
     while True:
         port = raw_input('--- Enter port index or full name: ')
         try:
@@ -482,7 +511,6 @@ def ask_for_port():
             port = ports[index]
         return port
 
-
 class Miniterm(object):
     """\
     Terminal application. Copy data from serial port to console and vice versa.
@@ -492,7 +520,7 @@ class Miniterm(object):
     def __init__(self, serial_instance, echo=False, eol='lf', filters=()):
         self.console = Console()
         self.serial = serial_instance
-        self.echo = echo
+        self.echo = False
         self.raw = False
         self.input_encoding = 'UTF-8'
         self.output_encoding = 'UTF-8'
@@ -506,6 +534,8 @@ class Miniterm(object):
         self.receiver_thread = None
         self.rx_decoder = None
         self.tx_decoder = None
+        self._xmodem_stream = None
+        self._pushback = None
 
     def _start_reader(self):
         """Start reader thread"""
@@ -601,13 +631,23 @@ class Miniterm(object):
                     self.stop()
                     break
                 if data:
-                    if self.raw:
-                        self.console.write_fluid(data)
+                    if self._xmodem_stream:
+                        self._pushback = data
+                        while self.serial.in_waiting:
+                            # Flush any extra start characters that snuck in
+                            self._pushback = self.serial.read(1)
+                        modem = XMODEM(self.getc, self.putc, mode='xmodem')
+                        modem.send(self._xmodem_stream, callback=self.progress)
+                        modem = None
+                        self._xmodem_stream = None
                     else:
-                        text = self.rx_decoder.decode(data)
-                        for transformation in self.rx_transformations:
-                            text = transformation.rx(text)
-                        self.console.write(text)
+                        if self.raw or collecting_input_line:
+                            self.console.write_fluid(data)
+                        else:
+                            text = self.rx_decoder.decode(data)
+                            for transformation in self.rx_transformations:
+                                text = transformation.rx(text)
+                            self.console.write(text)
         except serial.SerialException:
             self.alive = False
             self.console.cancel()
@@ -620,33 +660,42 @@ class Miniterm(object):
         locally.
         """
         menu_active = False
+
+        # Sending an editing command triggers FluidNC interactive mode
+        # Right Arrow is an innocuous one
+        # If you restart FluidNC with $bye or the reset switch, you
+        # will have to trigger interactive mode manually
+        time.sleep(2) # Time for FluidNC to be ready for input
+        right_arrow = '\x1b[C'
+        self.serial.write(self.tx_encoder.encode(right_arrow))
+
         try:
             while self.alive:
-                try:
-                    c = self.console.getkey()
-                except KeyboardInterrupt:
-                    c = '\x03'
-                if not self.alive:
-                    break
-                if menu_active:
-                    self.handle_menu_key(c)
-                    menu_active = False
-                elif c == self.menu_character:
-                    menu_active = True      # next char will be for menu
-                elif c == self.exit_character:
-                    self.stop()             # exit app
-                    break
-                else:
-                    #~ if self.raw:
-                    text = c
-                    for transformation in self.tx_transformations:
-                        text = transformation.tx(text)
-                    self.serial.write(self.tx_encoder.encode(text))
-                    if self.echo:
-                        echo_text = c
-                        for transformation in self.tx_transformations:
-                            echo_text = transformation.echo(echo_text)
-                        self.console.write(echo_text)
+                with self.console:
+                    try:
+                        data = self.console.getkey()
+                    except:
+                        data = self.exit_character  # Map ^C to exit
+                    for c in data:
+                        if not self.alive:
+                            break
+                        if menu_active:
+                            self.handle_menu_key(c)
+                            menu_active = False
+                        elif c == self.menu_character:
+                            menu_active = True      # next char will be for menu
+                        elif c == self.exit_character:
+                            self.stop()             # exit app
+                            break
+                        else:
+                            global collecting_input_line
+                            collecting_input_line = c != '\n'
+                            self.serial.write(self.tx_encoder.encode(c))
+                            if self.echo:
+                                echo_text = c
+                                for transformation in self.tx_transformations:
+                                    echo_text = transformation.echo(echo_text)
+                                self.console.write(echo_text)
         except:
             self.alive = False
             raise
@@ -658,6 +707,8 @@ class Miniterm(object):
             self.serial.write(self.tx_encoder.encode(c))
             if self.echo:
                 self.console.write(c)
+        elif c == '\x18':                       # CTRL+X -> upload xmodem
+            self.upload_xmodem()
         elif c == '\x15':                       # CTRL+U -> upload file
             self.upload_file()
         elif c in '\x08hH?':                    # CTRL+H, h, H, ? -> Show help
@@ -737,8 +788,61 @@ class Miniterm(object):
         else:
             sys.stderr.write('--- unknown menu character {} --\n'.format(key_description(c)))
             
+    # Support functions for XModem file upload
+    def getc(self, length, timeout=1):
+        if self._pushback:
+            gdata = self._pushback
+            self._pushback = None
+            return gdata
+        # try:
+        #    gdata = q.get(timeout=timeout)
+        # except:
+        #    gdata = None
+        self.serial.timeout = timeout
+        gdata = self.serial.read(length)
+        return gdata or None
 
-    def upload_file(self):            
+    def flush_getc(self, limit):
+        # while q.qsize() > limit:
+        #    dummy = q.get()
+        self.serial.timeout = 0.01
+        while True:
+            gdata = self.serial.read(1)
+            if not len(gdata):
+                break
+
+    def putc(self, data, timeout=1):
+        pbytes = self.serial.write(data)
+        # print(f'write {pbytes}')
+        return pbytes or None
+
+    def progress(self, packets, good, bad):
+        print(packets, end='\r')
+
+
+    def file_dialog(self, initial):
+        window = Tk()
+        pathname = filedialog.askopenfilename(title="File to Upload", initialfile=initial, filetypes=[("FluidNC Config", "*.yaml *.flnc *.txt"), ("All files", "*")])
+        destname = simpledialog.askstring("Uploader", "Destination Filename", initialvalue=os.path.split(pathname)[1])
+        window.destroy()
+        return (pathname, destname)
+
+    def upload_xmodem(self):
+        """Ask user for filename and send its contents"""
+        with self.console:
+            (filename, destname) = self.file_dialog("config.flnc")
+            if filename:
+                try:
+                    self._xmodem_stream = open(filename, 'rb')
+                    #show what is happening in the console.
+                    self.console.write('--- Sending file {} as {} ---\n'.format(filename, destname))
+                    #send the command to put FluidNC in receive mode
+                    self.serial.write(self.tx_encoder.encode(f'$Xmodem/Receive={destname}\n'))
+                except IOError as e:
+                    sys.stderr.write('--- ERROR opening file {}: {} ---\n'.format(filename, e))
+        # self._uploading = False
+
+    def upload_file(self, name="config.flnc"):
         """Ask user for filename and send its contents"""
         sys.stderr.write('\n--- File to upload: ')
         sys.stderr.flush()
@@ -746,16 +850,20 @@ class Miniterm(object):
             filename = sys.stdin.readline().rstrip('\r\n')
             if filename:
                 try:
-                    #send the command to put FluidNC in receive mode
-                    self.serial.write('$Xmodem/Receive=foo.txt\r'.encode())
-                    #show what is happening in the console.
-                    self.console.write('--- Sending file {} ---\n'.format(filename))
-                    # modem = XMODEM(self.upload_getc, self.upload_putc)
-                    # stream = open(filename, 'rb')
-                    # modem.send(stream)
-                        
+                    with open(filename, 'rb') as f:
+                        sys.stderr.write('--- Sending file {} ---\n'.format(filename))
+                        while True:
+                            block = f.read(1024)
+                            if not block:
+                                break
+                            self.serial.write(block)
+                            # Wait for output buffer to drain.
+                            self.serial.flush()
+                            sys.stderr.write('.')   # Progress indicator.
+                    sys.stderr.write('\n--- File {} sent ---\n'.format(filename))
                 except IOError as e:
                     sys.stderr.write('--- ERROR opening file {}: {} ---\n'.format(filename, e))
+        # self._uploading = False
 
     def change_filter(self):
         """change the i/o transformations"""
@@ -871,7 +979,7 @@ class Miniterm(object):
         """return the help text"""
         # help text, starts with blank line!
         return """
---- pySerial ({version}) - Fluidterm (miniterm) - help
+--- pySerial ({version}) - Fluidterm 1.1 (miniterm) - help
 ---
 --- {exit:8} Exit program (alias {menu} Q)
 --- {menu:8} Menu escape key, followed by:
@@ -1126,7 +1234,7 @@ def main(default_port=None, default_baudrate=115200, default_rts=None, default_d
             key_description(miniterm.exit_character),
             key_description(miniterm.menu_character),
             key_description(miniterm.menu_character),
-            key_description('\x08')))
+            key_description('H')))
 
     miniterm.start()
     try:
