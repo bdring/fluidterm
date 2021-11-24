@@ -25,13 +25,14 @@ jobs:
       run: |
         python3 -m pip install --upgrade pip
         pip3 install --upgrade PyInstaller
+        pip3 install --upgrade pyserial
     - name: Set release version
       run: |
         git config user.email "wmb@firmworks.com"
         git config user.name "Mitch Bradley"
         git tag "${{ github.event.inputs.tag }}" -a -m "Release test"
     - name: Build release
-      run: python3 -m PyInstaller --hidden-import pyserial --debug imports fluidterm.py
+      run: python3 -m PyInstaller --hidden-import pyserial fluidterm.py
     - name: Upload release
       uses: actions/upload-artifact@v2
       with:
