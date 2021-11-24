@@ -39,3 +39,6 @@ jobs:
       with:
         name: releaseZipFile
         path: dist/fluidterm
+    - name: Test
+      run: dist/fluidterm/fluidterm
+
