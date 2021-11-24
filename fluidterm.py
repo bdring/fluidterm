@@ -633,12 +633,27 @@ class Miniterm(object):
                     break
                 if data:
                     if self._xmodem_stream:
-                        self._pushback = data
-                        while self.serial.in_waiting:
-                            # Flush any extra start characters that snuck in
-                            self._pushback = self.serial.read(1)
+                        self.console.write_fluid(data)
+                        self.serial.timeout = 0.5;
+                        while True:
+                            data1 = self.serial.read_until()
+                            if len(data1):
+                                self.console.write_fluid(data1)
+                            else:
+                                break
+                        while False: # self.serial.in_waiting:
+                            # Flush report message
+                            ch = self.serial.read(1)
+                            # ACK, NAK, CAN
+                            if ch[0] == 0x06 or ch[0] == 0x15 or ch[0] == 0x18:
+                                self._pushback = ch[0]
+                                break
+                            else:
+                                self.console.write_fluid(ch)
+
                         modem = XMODEM(self.getc, self.putc, mode='xmodem')
-                        modem.send(self._xmodem_stream, callback=self.progress)
+                        if not modem.send(self._xmodem_stream, callback=self.progress):
+                            self.console.write("XModem reception cancelled\n");
                         modem = None
                         self._xmodem_stream = None
                     else:
