@@ -33,7 +33,7 @@ jobs:
         git config user.name "Mitch Bradley"
         git tag "${{ github.event.inputs.tag }}" -a -m "Release test"
     - name: Build release
-      run: python -m PyInstaller --hidden-imports pyserial fluidterm.py
+      run: python -m PyInstaller --hidden-import pyserial fluidterm.py
     - name: Upload release
       uses: actions/upload-artifact@v2
       with:
