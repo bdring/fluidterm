@@ -38,4 +38,4 @@ jobs:
       uses: actions/upload-artifact@v2
       with:
         name: releaseZipFile
-        path: dist/fluidterm/fluidterm
+        path: dist/fluidterm
