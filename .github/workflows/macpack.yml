@@ -26,11 +26,6 @@ jobs:
         python3 -m pip install --upgrade pip
         pip3 install --upgrade PyInstaller
         pip3 install --user pyserial xmodem tk
-    - name: Set release version
-      run: |
-        git config user.email "wmb@firmworks.com"
-        git config user.name "Mitch Bradley"
-        git tag "${{ github.event.inputs.tag }}" -a -m "Release test"
     - name: Build release
       run: python3 -m PyInstaller --hidden-import pyserial --hidden-import tkinter --hidden-import tkinter.filedialog --onefile fluidterm.py
     - name: Upload release
