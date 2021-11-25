@@ -29,9 +29,9 @@ jobs:
         pip3 install --upgrade PyInstaller
         pip3 install --user pyserial xmodem tk
     - name: Build release
-      run: python -m PyInstaller fluidterm.py
+      run: python -m PyInstaller --hidden-import pyserial --hidden-import tkinter --hidden-import tkinter.filedialog --onefile fluidterm.py
     - name: Upload release
       uses: actions/upload-artifact@v2
       with:
-        name: fluidterm-linux.zip
+        name: fluidterm-linux
         path: dist/fluidterm
