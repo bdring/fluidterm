@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 #
 # Very simple serial terminal
 #
@@ -17,11 +17,12 @@ import threading
 import logging
 import platform
 
-if platform.system() != 'Darwin':
+if platform.system() == 'Darwin':
+    import subprocess
+else:
     from tkinter import *
     from tkinter import filedialog
     from tkinter import simpledialog
-
 import time
 
 import serial
@@ -690,31 +691,30 @@ class Miniterm(object):
 
         try:
             while self.alive:
-                with self.console:
-                    try:
-                        data = self.console.getkey()
-                    except:
-                        data = self.exit_character  # Map ^C to exit
-                    for c in data:
-                        if not self.alive:
-                            break
-                        if menu_active:
-                            self.handle_menu_key(c)
-                            menu_active = False
-                        elif c == self.menu_character:
-                            menu_active = True      # next char will be for menu
-                        elif c == self.exit_character:
-                            self.stop()             # exit app
-                            break
-                        else:
-                            global collecting_input_line
-                            collecting_input_line = c != '\n'
-                            self.serial.write(self.tx_encoder.encode(c))
-                            if self.echo:
-                                echo_text = c
-                                for transformation in self.tx_transformations:
-                                    echo_text = transformation.echo(echo_text)
-                                self.console.write(echo_text)
+                try:
+                    data = self.console.getkey()
+                except:
+                    data = self.exit_character  # Map ^C to exit
+                for c in data:
+                    if not self.alive:
+                        break
+                    if menu_active:
+                        self.handle_menu_key(c)
+                        menu_active = False
+                    elif c == self.menu_character:
+                        menu_active = True      # next char will be for menu
+                    elif c == self.exit_character:
+                        self.stop()             # exit app
+                        break
+                    else:
+                        global collecting_input_line
+                        collecting_input_line = c != '\n'
+                        self.serial.write(self.tx_encoder.encode(c))
+                        if self.echo:
+                            echo_text = c
+                            for transformation in self.tx_transformations:
+                                echo_text = transformation.echo(echo_text)
+                            self.console.write(echo_text)
         except:
             self.alive = False
             raise
@@ -839,39 +839,50 @@ class Miniterm(object):
         print(packets, end='\r')
 
     if platform.system() == 'Darwin':
+        def mac_askstring(self, initial):
+            ascript = '''
+            -- iname - default file name
+            on run argv
+                set iname to item 1 of argv
+                try
+                    set theResponse to display dialog "Destination name" default answer iname with icon note buttons {"Cancel", "Continue"} default button "Continue"
+                   return text returned of theResponse as text
+                on error number -128
+                    return "" as text
+                end try
+            end run
+            '''
+            try:
+               proc = subprocess.check_output(['osascript', '-e', ascript, initial])
+               return proc.decode('utf-8').strip()
+            except subprocess.CalledProcessError as e:
+                print('Python error: [%d]\n' % e.returncode)
+
         def mac_file_dialog(self, initial):
             ascript = '''
             -- apath - default path for dialogs to open to
             on run argv
-                # set userCanceled to false
-                set apath to POSIX file (item 1 of argv) as alias
+                set apath to POSIX file (item 1 of argv)
                 try
-                    set fpath to POSIX path of (choose file with prompt "File to Upload" default location apath without invisibles)
+                    set fpath to POSIX path of (choose file with prompt "File to Upload" without invisibles)
                     return fpath as text
                 on error number -128
-                    # set userCanceled to true
                     return "" as text
                 end try
-                # if userCanceled then
-                #     return "Cancel"
-                # else
-                #     return fpath
-                # end if
             end run
             '''
             try:
-               proc = subprocess.check_output(['osascript', '-e', ascript, apath, cmd])
-               # if 'Cancel' in proc.decode('utf-8'):  # User pressed Cancel button
-               #     return ''
-               return proc.decode('utf-8')
+               proc = subprocess.check_output(['osascript', '-e', ascript, initial])
+               return proc.decode('utf-8').strip()
             except subprocess.CalledProcessError as e:
-                print('Python error: [%d]\n%s\n' % e.returncode, e.output)
+                print('Python error: [%d]\n' % e.returncode)
 
     def file_dialog(self, initial):
         if platform.system() == 'Darwin':
             # pathname = raw_input('--- Enter file name to send: ')
             pathname = self.mac_file_dialog(initial)
-            destname = os.path.split(pathname)[1]
+            print(pathname)
+            destname = self.mac_askstring(os.path.split(pathname)[1])
             return (pathname, destname)
         else:
             window = Tk()
