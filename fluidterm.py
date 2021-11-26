@@ -15,9 +15,12 @@ from re import split
 import sys
 import threading
 import logging
-from tkinter import *
-from tkinter import filedialog
-from tkinter import simpledialog
+import platform
+
+if platform.system() != 'Darwin':
+    from tkinter import *
+    from tkinter import filedialog
+    from tkinter import simpledialog
 
 import time
 
@@ -497,6 +500,7 @@ def ask_for_port():
     sys.stderr.write('\n--- Available ports:\n')
     for n, (port, desc, hwid) in enumerate(sorted(comports()), 1):
         sys.stderr.write('--- {:2}: {:20} {!r}\n'.format(n, port, desc))
+        ports.append(port)
 
     while True:
         port = raw_input('--- Enter port index or full name: ')
@@ -834,13 +838,48 @@ class Miniterm(object):
     def progress(self, packets, good, bad):
         print(packets, end='\r')
 
+    if platform.system() == 'Darwin':
+        def mac_file_dialog(self, initial):
+            ascript = '''
+            -- apath - default path for dialogs to open to
+            on run argv
+                # set userCanceled to false
+                set apath to POSIX file (item 1 of argv) as alias
+                try
+                    set fpath to POSIX path of (choose file with prompt "File to Upload" default location apath without invisibles)
+                    return fpath as text
+                on error number -128
+                    # set userCanceled to true
+                    return "" as text
+                end try
+                # if userCanceled then
+                #     return "Cancel"
+                # else
+                #     return fpath
+                # end if
+            end run
+            '''
+            try:
+               proc = subprocess.check_output(['osascript', '-e', ascript, apath, cmd])
+               # if 'Cancel' in proc.decode('utf-8'):  # User pressed Cancel button
+               #     return ''
+               return proc.decode('utf-8')
+            except subprocess.CalledProcessError as e:
+                print('Python error: [%d]\n%s\n' % e.returncode, e.output)
 
     def file_dialog(self, initial):
-        window = Tk()
-        pathname = filedialog.askopenfilename(title="File to Upload", initialfile=initial, filetypes=[("FluidNC Config", "*.yaml *.flnc *.txt"), ("All files", "*")])
-        destname = simpledialog.askstring("Uploader", "Destination Filename", initialvalue=os.path.split(pathname)[1])
-        window.destroy()
-        return (pathname, destname)
+        if platform.system() == 'Darwin':
+            # pathname = raw_input('--- Enter file name to send: ')
+            pathname = self.mac_file_dialog(initial)
+            destname = os.path.split(pathname)[1]
+            return (pathname, destname)
+        else:
+            window = Tk()
+            pathname = filedialog.askopenfilename(title="File to Upload", initialfile=initial, filetypes=[("FluidNC Config", "*.yaml *.flnc *.txt"), ("All files", "*")])
+            print("path",pathname)
+            destname = simpledialog.askstring("Uploader", "Destination Filename", initialvalue=os.path.split(pathname)[1])
+            window.destroy()
+            return (pathname, destname)
 
     def upload_xmodem(self):
         """Ask user for filename and send its contents"""
