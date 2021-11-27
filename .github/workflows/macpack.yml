@@ -10,7 +10,7 @@ on:
 jobs:
   build:
 
-    runs-on: macos-11
+    runs-on: macos-latest
 
     steps:
     - uses: actions/checkout@v2
@@ -33,6 +33,4 @@ jobs:
       with:
         name: releaseZipFile
         path: dist/fluidterm
-    - name: Test
-      run: cd dist && ./fluidterm
-
+    
