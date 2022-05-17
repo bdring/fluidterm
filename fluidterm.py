@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 #
 # Very simple serial terminal
 #
@@ -15,10 +15,14 @@ from re import split
 import sys
 import threading
 import logging
-from tkinter import *
-from tkinter import filedialog
-from tkinter import simpledialog
+import platform
 
+if platform.system() == 'Darwin':
+    import subprocess
+else:
+    from tkinter import *
+    from tkinter import filedialog
+    from tkinter import simpledialog
 import time
 
 import serial
@@ -497,6 +501,7 @@ def ask_for_port():
     sys.stderr.write('\n--- Available ports:\n')
     for n, (port, desc, hwid) in enumerate(sorted(comports()), 1):
         sys.stderr.write('--- {:2}: {:20} {!r}\n'.format(n, port, desc))
+        ports.append(port)
 
     while True:
         port = raw_input('--- Enter port index or full name: ')
@@ -528,6 +533,7 @@ class Miniterm(object):
         self.filters = ['fluidNC']
         self.update_transformations()
         self.exit_character = unichr(0x1d)  # GS/CTRL+]
+        self.exit_character2 = unichr(0x11)  # GS/CTRL+Q
         self.menu_character = unichr(0x14)  # Menu: CTRL+T
         self.alive = None
         self._reader_alive = None
@@ -686,38 +692,37 @@ class Miniterm(object):
 
         try:
             while self.alive:
-                with self.console:
-                    try:
-                        data = self.console.getkey()
-                    except:
-                        data = self.exit_character  # Map ^C to exit
-                    for c in data:
-                        if not self.alive:
-                            break
-                        if menu_active:
-                            self.handle_menu_key(c)
-                            menu_active = False
-                        elif c == self.menu_character:
-                            menu_active = True      # next char will be for menu
-                        elif c == self.exit_character:
-                            self.stop()             # exit app
-                            break
-                        else:
-                            global collecting_input_line
-                            collecting_input_line = c != '\n'
-                            self.serial.write(self.tx_encoder.encode(c))
-                            if self.echo:
-                                echo_text = c
-                                for transformation in self.tx_transformations:
-                                    echo_text = transformation.echo(echo_text)
-                                self.console.write(echo_text)
+                try:
+                    data = self.console.getkey()
+                except:
+                    data = self.exit_character  # Map ^C to exit
+                for c in data:
+                    if not self.alive:
+                        break
+                    if menu_active:
+                        self.handle_menu_key(c)
+                        menu_active = False
+                    elif c == self.menu_character:
+                        menu_active = True      # next char will be for menu
+                    elif c == self.exit_character or c == self.exit_character2:
+                        self.stop()             # exit app
+                        break
+                    else:
+                        global collecting_input_line
+                        collecting_input_line = c != '\n'
+                        self.serial.write(self.tx_encoder.encode(c))
+                        if self.echo:
+                            echo_text = c
+                            for transformation in self.tx_transformations:
+                                echo_text = transformation.echo(echo_text)
+                            self.console.write(echo_text)
         except:
             self.alive = False
             raise
 
     def handle_menu_key(self, c):
         """Implement a simple menu / settings"""
-        if c == self.menu_character or c == self.exit_character:
+        if c == self.menu_character or c == self.exit_character or c == self.exit_character2:
             # Menu/exit character again -> send itself
             self.serial.write(self.tx_encoder.encode(c))
             if self.echo:
@@ -834,13 +839,59 @@ class Miniterm(object):
     def progress(self, packets, good, bad):
         print(packets, end='\r')
 
+    if platform.system() == 'Darwin':
+        def mac_askstring(self, initial):
+            ascript = '''
+            -- iname - default file name
+            on run argv
+                set iname to item 1 of argv
+                try
+                    set theResponse to display dialog "Destination name" default answer iname with icon note buttons {"Cancel", "Continue"} default button "Continue"
+                   return text returned of theResponse as text
+                on error number -128
+                    return "" as text
+                end try
+            end run
+            '''
+            try:
+               proc = subprocess.check_output(['osascript', '-e', ascript, initial])
+               return proc.decode('utf-8').strip()
+            except subprocess.CalledProcessError as e:
+                print('Python error: [%d]\n' % e.returncode)
+
+        def mac_file_dialog(self, initial):
+            ascript = '''
+            -- apath - default path for dialogs to open to
+            on run argv
+                set apath to POSIX file (item 1 of argv)
+                try
+                    set fpath to POSIX path of (choose file with prompt "File to Upload" without invisibles)
+                    return fpath as text
+                on error number -128
+                    return "" as text
+                end try
+            end run
+            '''
+            try:
+               proc = subprocess.check_output(['osascript', '-e', ascript, initial])
+               return proc.decode('utf-8').strip()
+            except subprocess.CalledProcessError as e:
+                print('Python error: [%d]\n' % e.returncode)
 
     def file_dialog(self, initial):
-        window = Tk()
-        pathname = filedialog.askopenfilename(title="File to Upload", initialfile=initial, filetypes=[("FluidNC Config", "*.yaml *.flnc *.txt"), ("All files", "*")])
-        destname = simpledialog.askstring("Uploader", "Destination Filename", initialvalue=os.path.split(pathname)[1])
-        window.destroy()
-        return (pathname, destname)
+        if platform.system() == 'Darwin':
+            # pathname = raw_input('--- Enter file name to send: ')
+            pathname = self.mac_file_dialog(initial)
+            print(pathname)
+            destname = self.mac_askstring(os.path.split(pathname)[1])
+            return (pathname, destname)
+        else:
+            window = Tk()
+            pathname = filedialog.askopenfilename(title="File to Upload", initialfile=initial, filetypes=[("FluidNC Config", "*.yaml *.flnc *.txt"), ("All files", "*")])
+            print("path",pathname)
+            destname = simpledialog.askstring("Uploader", "Destination Filename", initialvalue=os.path.split(pathname)[1])
+            window.destroy()
+            return (pathname, destname)
 
     def upload_xmodem(self):
         """Ask user for filename and send its contents"""
@@ -973,7 +1024,7 @@ class Miniterm(object):
             sys.stderr.write('--- Quit: {exit} | p: port change | any other key to reconnect ---\n'.format(
                 exit=key_description(self.exit_character)))
             k = self.console.getkey()
-            if k == self.exit_character:
+            if k == self.exit_character or c == self.exit_character2:
                 self.stop()             # exit app
                 break
             elif k in 'pP':
@@ -1019,6 +1070,7 @@ class Miniterm(object):
 ---    r R        disable/enable hardware flow control
 """.format(version=getattr(serial, 'VERSION', 'unknown version'),
            exit=key_description(self.exit_character),
+           exit2=key_description(self.exit_character2),
            menu=key_description(self.menu_character),
            rts=key_description('\x12'),
            dtr=key_description('\x04'),
@@ -1245,8 +1297,9 @@ def main(default_port=None, default_baudrate=115200, default_rts=None, default_d
     if not args.quiet:
         sys.stderr.write('--- Fluidterm on {p.name}  {p.baudrate},{p.bytesize},{p.parity},{p.stopbits} ---\n'.format(
             p=miniterm.serial))
-        sys.stderr.write('--- Quit: {} | Menu: {} | Help: {} followed by {} ---\n'.format(
+        sys.stderr.write('--- Quit: {} or {} | Menu: {} | Help: {} followed by {} ---\n'.format(
             key_description(miniterm.exit_character),
+            key_description(miniterm.exit_character2),
             key_description(miniterm.menu_character),
             key_description(miniterm.menu_character),
             key_description('H')))
