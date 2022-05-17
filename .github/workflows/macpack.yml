@@ -33,4 +33,3 @@ jobs:
       with:
         name: releaseZipFile
         path: dist/fluidterm
-    

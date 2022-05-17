@@ -68,7 +68,17 @@ Changes
 
 - There is a new Transformation to colorize FluidNC responses. It uses that by default.
 
-- You can run it as a python script or as a [Windows exe](https://github.com/bdring/fluidterm/tree/main/dist).
+### Installation
+
+If you don't have Python installed, get the laytest version 3 from [python.org](https://www.python.org/). Use also need to make sure you have all the libraries. use pip install to get them.
+- pip install pyserial
+- pip install xmodem
+
+The best method to get fluidterm is to use Git to clone the repositiory to your computer. You can also download the code as a zip file and extract to a folder on your computer.
+
+### Usage
+
+- With Python: **python fluidterm.py** from the fluidterm folder.
 
 ### Restarting the eSP32
 
